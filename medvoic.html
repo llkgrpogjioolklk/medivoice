@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Medicine Voice Reminder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #c2e9fb, #a1c4fd);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      width: 320px;
+    }
+    .container h2 {
+      text-align: center;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background-color: #4a90e2;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+    }
+    button:hover {
+      background-color: #357ab8;
+    }
+    #stopButton {
+      background-color: red;
+      display: none;
+    }
+    .success {
+      text-align: center;
+      color: green;
+      margin-top: 10px;
+    }
+    #reminderList {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Medicine Reminder</h2>
+    <input type="text" id="medicine" placeholder="Medicine Name">
+    <input type="time" id="time">
+    <input type="text" id="dose" placeholder="Dose (e.g., 1 tablet)">
+    <select id="language">
+      <option value="en-IN">English</option>
+      <option value="hi-IN">Hindi</option>
+      <option value="te-IN">Telugu</option>
+      <option value="ta-IN">Tamil</option>
+    </select>
+    <button onclick="addReminder()">Add Reminder</button>
+    <button id="stopButton" onclick="stopVoice()">Stop Voice</button>
+    <p id="status" class="success"></p>
+    <div id="reminderList"></div>
+  </div>
+
+  <script>
+    let reminders = [];
+    let currentUtterance = null;
+    let currentTimeSpeaking = null;
+    let availableVoices = [];
+
+    speechSynthesis.onvoiceschanged = () => {
+      availableVoices = speechSynthesis.getVoices();
+    };
+
+    function addReminder() {
+      const medicine = document.getElementById("medicine").value;
+      const time = document.getElementById("time").value;
+      const dose = document.getElementById("dose").value;
+      const language = document.getElementById("language").value;
+
+      if (!medicine || !time || !dose) {
+        document.getElementById("status").textContent = "Please fill all fields.";
+        return;
+      }
+
+      reminders.push({
+        medicine,
+        time,
+        dose,
+        language,
+        stopped: false
+      });
+
+      document.getElementById("status").textContent = "Reminder added!";
+      updateReminderList();
+      Notification.requestPermission();
+    }
+
+    function updateReminderList() {
+      const list = reminders.map(r => • ${r.time}).join('<br>');
+      document.getElementById("reminderList").innerHTML = <strong>Set Times:</strong><br>${list};
+    }
+
+    function getMessage(language, medicine, dose) {
+      switch (language) {
+        case "hi-IN":
+          return ??? ???? ?? ??? ?? ??? ??: ${medicine}, ??????: ${dose};
+        case "te-IN":
+          return ?? ???? ???????? ???? ????????: ${medicine}, ??????: ${dose};
+        case "ta-IN":
+          return ?????? ??????? ????????????????? ?????: ${medicine}, ????: ${dose};
+        default:
+          return It's time to take your medicine: ${medicine}, dose: ${dose};
+      }
+    }
+
+    function speakReminder(reminder) {
+      const message = getMessage(reminder.language, reminder.medicine, reminder.dose);
+      currentUtterance = new SpeechSynthesisUtterance(message);
+      currentUtterance.lang = reminder.language;
+
+      const matchedVoice = availableVoices.find(voice => voice.lang === reminder.language);
+      if (matchedVoice) currentUtterance.voice = matchedVoice;
+
+      speechSynthesis.speak(currentUtterance);
+      document.getElementById("stopButton").style.display = "block";
+      currentTimeSpeaking = reminder.time;
+
+      if (Notification.permission === "granted") {
+        new Notification("Medicine Reminder", { body: message });
+      }
+
+      const repeatInterval = setInterval(() => {
+        if (reminder.stopped || currentTimeSpeaking !== reminder.time) {
+          clearInterval(repeatInterval);
+          return;
+        }
+        speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+      }, 5000);
+    }
+
+    setInterval(() => {
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 5);
+
+      reminders.forEach(reminder => {
+        if (reminder.time === currentTime && !reminder.stopped && currentTimeSpeaking !== currentTime) {
+          speakReminder(reminder);
+        }
+      });
+    }, 1000);
+
+    function stopVoice() {
+      speechSynthesis.cancel();
+      reminders.forEach(r => {
+        if (r.time === currentTimeSpeaking) {
+          r.stopped = true;
+        }
+      });
+      document.getElementById("stopButton").style.display = "none";
+      document.getElementById("status").textContent = "Voice stopped for " + currentTimeSpeaking;
+      currentTimeSpeaking = null;
+    }
+  </script>
+</body>
+</html>
